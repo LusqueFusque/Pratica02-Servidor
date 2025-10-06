@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="ChangeListManager">
     <list default="true" id="8e7fef3b-e7a5-4d2c-8873-64bbba1ddb62" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -26,6 +29,10 @@
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;&lt;unknown&gt;&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
@@ -84,6 +91,10 @@
       <updated>1757966136809</updated>
       <workItem from="1757966138268" duration="17000" />
       <workItem from="1758571031175" duration="301000" />
+      <workItem from="1758572118272" duration="17000" />
+      <workItem from="1759779454668" duration="668000" />
+      <workItem from="1759781183820" duration="963000" />
+      <workItem from="1759782504672" duration="209000" />
     </task>
     <servers />
   </component>
