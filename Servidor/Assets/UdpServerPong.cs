@@ -17,6 +17,9 @@ public class UdpServerPong : MonoBehaviour
 
     public bool running = true;
 
+    public GameObject paddle1Obj;
+    public GameObject paddle2Obj;
+
     int nextId = 1;
 
     void Start()
@@ -30,6 +33,17 @@ public class UdpServerPong : MonoBehaviour
     }
     void Update()
     {
+        foreach (var kvp in playerPositions)
+        {
+            int id = kvp.Key;
+            Vector2 pos = kvp.Value;
+
+            if (id == 1 && paddle1Obj != null)
+            paddle1Obj.GetComponent<Rigidbody2D>().MovePosition(pos);
+            else if (id == 2 && paddle2Obj != null)
+            paddle2Obj.GetComponent<Rigidbody2D>().MovePosition(pos);
+        }
+
         if (ballScript != null)
         {
             if (playerPositions.ContainsKey(1))
