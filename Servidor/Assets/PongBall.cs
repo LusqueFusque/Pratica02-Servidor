@@ -12,8 +12,8 @@ public class PongBall : MonoBehaviour
 
     public Vector2 paddle1Pos;
     public Vector2 paddle2Pos;
-    public float paddleWidth = 0.5f;
-    public float paddleHeight = 1.5f;
+    public float paddleWidth = 1f;
+    public float paddleHeight = 2.8f;
 
     public UdpServerPong server;
 
@@ -27,7 +27,7 @@ public class PongBall : MonoBehaviour
         direction = new Vector2(Random.value < 0.5f ? -1 : 1, Random.Range(-0.5f, 0.5f)).normalized;
 
         // Velocidade inicial
-        rb.velocity = direction * speed;
+        rb.linearVelocity = direction * speed;
     }
 
     void FixedUpdate()
@@ -39,7 +39,7 @@ public class PongBall : MonoBehaviour
         if (transform.position.y > topLimit || transform.position.y < bottomLimit)
         {
             direction = new Vector2(direction.x, -direction.y);
-            rb.velocity = direction * speed;
+            rb.linearVelocity = direction * speed;
         }
     }
 
@@ -47,7 +47,7 @@ public class PongBall : MonoBehaviour
     {
         // Rebate horizontalmente
         direction = new Vector2(-direction.x, direction.y);
-        rb.velocity = direction * speed;
+        rb.linearVelocity = direction * speed;
     }
 
     void SendBallPosition()

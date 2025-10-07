@@ -7,53 +7,48 @@ using System.Collections.Generic;
 
 public class UdpServerPong : MonoBehaviour
 {
-
     UdpClient server;
     IPEndPoint anyEP;
     Thread receiveThread;
+
     public Dictionary<int, Vector2> playerPositions = new Dictionary<int, Vector2>();
     Dictionary<string, int> clientIds = new Dictionary<string, int>();
+
     public PongBall ballScript; // arraste a bolinha no Inspector
+    public GameObject paddle1Obj; // paddle esquerda
+    public GameObject paddle2Obj; // paddle direita
 
     public bool running = true;
-
-    public GameObject paddle1Obj;
-    public GameObject paddle2Obj;
-
-    int nextId = 1;
+    int nextId = 1; // próximo ID a ser atribuído
 
     void Start()
     {
         server = new UdpClient(5001);
         anyEP = new IPEndPoint(IPAddress.Any, 0);
-        receiveThread = new Thread(ReceiveData);
-        receiveThread.Start();
-        Debug.Log("Servidor iniciado na porta 5001");
 
+        receiveThread = new Thread(ReceiveData);
+        receiveThread.IsBackground = true;
+        receiveThread.Start();
+
+        Debug.Log("Servidor iniciado na porta 5001");
     }
+
     void Update()
     {
-        foreach (var kvp in playerPositions)
-        {
-            int id = kvp.Key;
-            Vector2 pos = kvp.Value;
+        // Atualiza posição física das raquetes no servidor
+        if (playerPositions.ContainsKey(1) && paddle1Obj != null)
+            paddle1Obj.GetComponent<Rigidbody2D>().MovePosition(playerPositions[1]);
 
-            if (id == 1 && paddle1Obj != null)
-            paddle1Obj.GetComponent<Rigidbody2D>().MovePosition(pos);
-            else if (id == 2 && paddle2Obj != null)
-            paddle2Obj.GetComponent<Rigidbody2D>().MovePosition(pos);
-        }
+        if (playerPositions.ContainsKey(2) && paddle2Obj != null)
+            paddle2Obj.GetComponent<Rigidbody2D>().MovePosition(playerPositions[2]);
 
+        // Passa posições atualizadas para o script da bola
         if (ballScript != null)
         {
-            if (playerPositions.ContainsKey(1))
-                ballScript.paddle1Pos = playerPositions[1];
-
-            if (playerPositions.ContainsKey(2))
-                ballScript.paddle2Pos = playerPositions[2];
+            ballScript.paddle1Pos = playerPositions.ContainsKey(1) ? playerPositions[1] : paddle1Obj.transform.position;
+            ballScript.paddle2Pos = playerPositions.ContainsKey(2) ? playerPositions[2] : paddle2Obj.transform.position;
         }
     }
-
 
     void ReceiveData()
     {
@@ -63,35 +58,43 @@ public class UdpServerPong : MonoBehaviour
             {
                 byte[] data = server.Receive(ref anyEP);
                 string msg = Encoding.UTF8.GetString(data);
-                string key = anyEP.Address.ToString() + ":" + anyEP.Port;
+                string key = anyEP.Address + ":" + anyEP.Port;
 
-                // Atribui ID se for cliente novo
+                // ===== Atribui ID ao cliente novo =====
                 if (!clientIds.ContainsKey(key))
                 {
-                    clientIds[key] = nextId++;
-                    string assignMsg = "ASSIGN:" + clientIds[key];
+                    if (nextId > 2)
+                    {
+                        Debug.LogWarning("Mais de 2 jogadores tentando conectar. Ignorado: " + key);
+                        continue;
+                    }
+
+                    clientIds[key] = nextId;
+                    int assignedId = nextId;
+                    nextId++;
+
+                    string assignMsg = "ASSIGN:" + assignedId;
                     byte[] assignData = Encoding.UTF8.GetBytes(assignMsg);
                     server.Send(assignData, assignData.Length, anyEP);
-                    Debug.Log("Novo cliente → " + key + " recebeu ID " + clientIds[key]);
+
+                    Debug.Log($"Novo cliente → {key} recebeu ID {assignedId}");
                 }
 
                 int id = clientIds[key];
 
-                // Se for mensagem de posição
+                // ===== Atualiza posição da raquete =====
                 if (msg.StartsWith("POS:"))
                 {
-                    string coords = msg.Substring(4); // Remove "POS:"
-                    string[] parts = coords.Split(';');
+                    string[] parts = msg.Substring(4).Split(';');
                     if (parts.Length == 2)
                     {
                         float x = float.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
                         float y = float.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
+
                         playerPositions[id] = new Vector2(x, y);
 
-
-                        // Reenvia para os outros clientes
-                        string relayMsg =
-                            $"PLAYER:{id}:{x.ToString(System.Globalization.CultureInfo.InvariantCulture)};{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+                        // Reenvia posição apenas aos outros clientes
+                        string relayMsg = $"PLAYER:{id}:{x.ToString(System.Globalization.CultureInfo.InvariantCulture)};{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
                         byte[] relayData = Encoding.UTF8.GetBytes(relayMsg);
 
                         foreach (var kvp in clientIds)
@@ -113,11 +116,11 @@ public class UdpServerPong : MonoBehaviour
             }
             catch (System.Exception ex)
             {
-                Debug.LogError("Erro geral no servidor: " + ex.Message);
+                Debug.LogError("Erro no servidor: " + ex.Message);
             }
         }
     }
-    
+
     public void BroadcastToAllClients(string message)
     {
         byte[] data = Encoding.UTF8.GetBytes(message);
@@ -128,11 +131,11 @@ public class UdpServerPong : MonoBehaviour
             server.Send(data, data.Length, clientEP);
         }
     }
+
     void OnApplicationQuit()
     {
         running = false;
-        receiveThread?.Join(); // espera o thread encerrar
+        receiveThread?.Join();
         server?.Close();
     }
 }
-    
