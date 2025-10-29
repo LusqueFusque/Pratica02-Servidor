@@ -6,6 +6,8 @@ TagManager:
   tags:
   - Wall
   - Paddle
+  - GoalZoneL
+  - GoalZoneR
   layers:
   - Default
   - TransparentFX

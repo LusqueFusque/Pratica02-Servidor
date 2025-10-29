@@ -16,10 +16,6 @@ public class PongBallFour : MonoBehaviour
     public UdpServerPongFour server;
     Rigidbody2D rb;
     
-    // Limites das paredes laterais (ajuste conforme sua cena)
-    public float leftWallX = -9f;
-    public float rightWallX = 9f;
-    
     // Posição inicial da bola
     private Vector3 startPosition;
     
@@ -33,25 +29,6 @@ public class PongBallFour : MonoBehaviour
     void FixedUpdate()
     {
         SendBallPosition();
-        CheckGoal();
-    }
-    
-    void CheckGoal()
-    {
-        // Verifica se a bola passou da parede esquerda (ponto para time direita - jogadores 3 e 4)
-        if (transform.position.x < leftWallX)
-        {
-            Debug.Log("GOL! Time Direita marcou!");
-            server.AddScore(false); // false = time esquerda levou gol
-            ResetBall();
-        }
-        // Verifica se a bola passou da parede direita (ponto para time esquerda - jogadores 1 e 2)
-        else if (transform.position.x > rightWallX)
-        {
-            Debug.Log("GOL! Time Esquerda marcou!");
-            server.AddScore(true); // true = time direita levou gol
-            ResetBall();
-        }
     }
     
     void ResetBall()
@@ -61,7 +38,6 @@ public class PongBallFour : MonoBehaviour
         
         // Nova direção aleatória
         direction = new Vector2(Random.value < 0.5f ? -1 : 1, Random.Range(-0.5f, 0.5f)).normalized;
-        rb.linearVelocity = direction * speed;
         
         // Pequeno delay para dar tempo dos jogadores se posicionarem
         rb.linearVelocity = Vector2.zero;
@@ -75,6 +51,7 @@ public class PongBallFour : MonoBehaviour
     
     void OnCollisionEnter2D(Collision2D collision)
     {
+        // Detecta colisão com parede normal
         if (collision.gameObject.CompareTag("Wall"))
         {
             if (collision.contacts[0].normal.y != 0)
@@ -85,6 +62,7 @@ public class PongBallFour : MonoBehaviour
             
             rb.linearVelocity = direction * speed;
         }
+        // Detecta colisão com paddle
         else if (collision.gameObject.CompareTag("Paddle"))
         {
             direction = new Vector2(-direction.x, direction.y);
@@ -92,6 +70,24 @@ public class PongBallFour : MonoBehaviour
             direction.y = offset * 2f;
             direction.Normalize();
             rb.linearVelocity = direction * speed;
+        }
+    }
+    
+    void OnTriggerEnter2D(Collider2D other)
+    {
+        // Detecta entrada na zona de gol esquerda (GoalZoneL)
+        if (other.gameObject.CompareTag("GoalZoneL"))
+        {
+            Debug.Log("GOL! Time Direita (jogadores 3 e 4) marcou!");
+            server.AddScore(false); // false = time esquerda levou gol
+            ResetBall();
+        }
+        // Detecta entrada na zona de gol direita (GoalZoneR)
+        else if (other.gameObject.CompareTag("GoalZoneR"))
+        {
+            Debug.Log("GOL! Time Esquerda (jogadores 1 e 2) marcou!");
+            server.AddScore(true); // true = time direita levou gol
+            ResetBall();
         }
     }
     
