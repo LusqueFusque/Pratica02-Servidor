@@ -78,14 +78,14 @@ public class PongBallFour : MonoBehaviour
         // Detecta entrada na zona de gol esquerda (GoalZoneL)
         if (other.gameObject.CompareTag("GoalZoneL"))
         {
-            Debug.Log("GOL! Time Direita (jogadores 3 e 4) marcou!");
+            Debug.Log("GOL! Time Rosa (jogadores 3 e 4) marcou!");
             server.AddScore(false); // false = time esquerda levou gol
             ResetBall();
         }
         // Detecta entrada na zona de gol direita (GoalZoneR)
         else if (other.gameObject.CompareTag("GoalZoneR"))
         {
-            Debug.Log("GOL! Time Esquerda (jogadores 1 e 2) marcou!");
+            Debug.Log("GOL! Time Verde (jogadores 1 e 2) marcou!");
             server.AddScore(true); // true = time direita levou gol
             ResetBall();
         }
