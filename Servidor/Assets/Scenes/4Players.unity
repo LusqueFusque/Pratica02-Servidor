@@ -1887,6 +1887,8 @@ MonoBehaviour:
   paddle3Pos: {x: 0, y: 0}
   paddle4Pos: {x: 0, y: 0}
   server: {fileID: 30511662}
+  leftWallX: -9.1
+  rightWallX: 9.1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

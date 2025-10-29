@@ -23,7 +23,11 @@ public class UdpServerPongFour : MonoBehaviour
     public GameObject paddle4Obj; // direita inferior
     
     public bool running = true;
-    int nextId = 1; // próximo ID (1 a 4)
+    int nextId = 1;
+    
+    // PLACAR
+    private int scoreLeft = 0;  // Time Esquerda (jogadores 1 e 2)
+    private int scoreRight = 0; // Time Direita (jogadores 3 e 4)
     
     void Start()
     {
@@ -60,6 +64,25 @@ public class UdpServerPongFour : MonoBehaviour
         }
     }
     
+    // Adiciona ponto e envia atualização para todos os clientes
+    public void AddScore(bool rightSideScored)
+    {
+        if (rightSideScored)
+            scoreRight++;
+        else
+            scoreLeft++;
+        
+        Debug.Log($"PLACAR: Esquerda {scoreLeft} x {scoreRight} Direita");
+        BroadcastScore();
+    }
+    
+    // Envia placar para todos os clientes
+    void BroadcastScore()
+    {
+        string scoreMsg = $"SCORE:{scoreLeft};{scoreRight}";
+        BroadcastToAllClients(scoreMsg);
+    }
+    
     void ReceiveData()
     {
         while (running)
@@ -88,7 +111,12 @@ public class UdpServerPongFour : MonoBehaviour
                     server.Send(assignData, assignData.Length, anyEP);
                     Debug.Log($"Novo cliente → {key} recebeu ID {assignedId}");
                     
-                    // Envia posições de todos os jogadores já conectados para o novo jogador
+                    // Envia placar atual para o novo jogador
+                    string scoreMsg = $"SCORE:{scoreLeft};{scoreRight}";
+                    byte[] scoreData = Encoding.UTF8.GetBytes(scoreMsg);
+                    server.Send(scoreData, scoreData.Length, anyEP);
+                    
+                    // Envia posições de todos os jogadores já conectados
                     foreach (var kvp in playerPositions)
                     {
                         string existingPlayerMsg = $"PLAYER:{kvp.Key}:{kvp.Value.x.ToString(System.Globalization.CultureInfo.InvariantCulture)};{kvp.Value.y.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
