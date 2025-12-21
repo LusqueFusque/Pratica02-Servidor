@@ -5,6 +5,7 @@ using System.Text;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine.UI;
+using System.Threading;
 
 public class UDPChatSystem : MonoBehaviour
 {
@@ -17,6 +18,7 @@ public class UDPChatSystem : MonoBehaviour
     public TMP_InputField chatInput;
     public TextMeshProUGUI chatDisplay;
     public ScrollRect scrollRect;
+    public Button sendButton;
     public int maxMessages = 50;
     
     [Header("Configurações do Jogador")]
@@ -26,6 +28,8 @@ public class UDPChatSystem : MonoBehaviour
     private UdpClient udpClient;
     private IPEndPoint remoteEndPoint;
     private List<IPEndPoint> connectedClients = new List<IPEndPoint>();
+    private Thread receiveThread;
+    private bool isRunning = false;
     
     // Mensagens
     private List<string> chatMessages = new List<string>();
@@ -33,6 +37,12 @@ public class UDPChatSystem : MonoBehaviour
     
     void Start()
     {
+        // Conecta o botão ao método de enviar
+        if (sendButton != null)
+        {
+            sendButton.onClick.AddListener(SendChatMessage);
+        }
+        
         InitializeChat();
         AddSystemMessage("=== CHAT INICIADO ===");
         
@@ -50,6 +60,8 @@ public class UDPChatSystem : MonoBehaviour
     {
         try
         {
+            isRunning = true;
+            
             if (isServer)
             {
                 // SERVIDOR: Escuta em qualquer IP na porta especificada
@@ -67,12 +79,41 @@ public class UDPChatSystem : MonoBehaviour
                 SendConnectionMessage();
             }
             
-            // Inicia recebimento assíncrono
-            udpClient.BeginReceive(ReceiveCallback, null);
+            // Inicia thread separada para recebimento
+            receiveThread = new Thread(new ThreadStart(ReceiveData));
+            receiveThread.IsBackground = true;
+            receiveThread.Start();
         }
         catch (System.Exception e)
         {
             AddSystemMessage($"ERRO ao iniciar chat: {e.Message}");
+        }
+    }
+    
+    void ReceiveData()
+    {
+        while (isRunning)
+        {
+            try
+            {
+                IPEndPoint senderEndPoint = new IPEndPoint(IPAddress.Any, 0);
+                byte[] receivedData = udpClient.Receive(ref senderEndPoint);
+                
+                string message = Encoding.UTF8.GetString(receivedData);
+                
+                // Adiciona à fila para processar na thread principal
+                lock (messageQueue)
+                {
+                    messageQueue.Enqueue($"{senderEndPoint.Address}:{senderEndPoint.Port}|{message}");
+                }
+            }
+            catch (System.Exception e)
+            {
+                if (isRunning)
+                {
+                    Debug.LogError($"Erro ao receber: {e.Message}");
+                }
+            }
         }
     }
     
@@ -81,34 +122,6 @@ public class UDPChatSystem : MonoBehaviour
         string connectMsg = $"CONNECT|{playerName}";
         byte[] data = Encoding.UTF8.GetBytes(connectMsg);
         udpClient.Send(data, data.Length, remoteEndPoint);
-    }
-    
-    void ReceiveCallback(System.IAsyncResult result)
-    {
-        try
-        {
-            IPEndPoint senderEndPoint = new IPEndPoint(IPAddress.Any, 0);
-            byte[] receivedData = udpClient.EndReceive(result, ref senderEndPoint);
-            
-            string message = Encoding.UTF8.GetString(receivedData);
-            ProcessReceivedMessage(message, senderEndPoint);
-            
-            // Continua recebendo
-            udpClient.BeginReceive(ReceiveCallback, null);
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"Erro ao receber: {e.Message}");
-        }
-    }
-    
-    void ProcessReceivedMessage(string message, IPEndPoint sender)
-    {
-        // Adiciona mensagem à fila para processar na thread principal
-        lock (messageQueue)
-        {
-            messageQueue.Enqueue($"{sender.Address}|{message}");
-        }
     }
     
     void Update()
@@ -123,12 +136,15 @@ public class UDPChatSystem : MonoBehaviour
                 
                 if (parts.Length >= 2)
                 {
-                    IPAddress senderIP = IPAddress.Parse(parts[0]);
+                    string[] addressParts = parts[0].Split(':');
+                    IPAddress senderIP = IPAddress.Parse(addressParts[0]);
+                    int senderPort = int.Parse(addressParts[1]);
+                    
                     string messageType = parts[1];
                     
                     if (messageType == "CONNECT" && parts.Length >= 3)
                     {
-                        HandleConnection(senderIP, parts[2]);
+                        HandleConnection(senderIP, senderPort, parts[2]);
                     }
                     else if (messageType == "CHAT" && parts.Length >= 4)
                     {
@@ -149,11 +165,11 @@ public class UDPChatSystem : MonoBehaviour
         }
     }
     
-    void HandleConnection(IPAddress ip, string name)
+    void HandleConnection(IPAddress ip, int port, string name)
     {
         if (isServer)
         {
-            IPEndPoint newClient = new IPEndPoint(ip, chatPort);
+            IPEndPoint newClient = new IPEndPoint(ip, port);
             
             if (!IsClientConnected(newClient))
             {
@@ -190,7 +206,7 @@ public class UDPChatSystem : MonoBehaviour
     {
         foreach (IPEndPoint c in connectedClients)
         {
-            if (c.Address.Equals(client.Address))
+            if (c.Address.Equals(client.Address) && c.Port == client.Port)
                 return true;
         }
         return false;
@@ -198,7 +214,7 @@ public class UDPChatSystem : MonoBehaviour
     
     public void SendChatMessage()
     {
-        if (string.IsNullOrEmpty(chatInput.text))
+        if (chatInput == null || string.IsNullOrEmpty(chatInput.text))
             return;
         
         string message = chatInput.text.Trim();
@@ -212,15 +228,22 @@ public class UDPChatSystem : MonoBehaviour
             string networkMessage = $"CHAT|{playerName}|{message}";
             byte[] data = Encoding.UTF8.GetBytes(networkMessage);
             
-            if (isServer)
+            try
             {
-                // Servidor envia para todos os clientes
-                BroadcastMessage(networkMessage);
+                if (isServer)
+                {
+                    // Servidor envia para todos os clientes
+                    BroadcastMessage(networkMessage);
+                }
+                else
+                {
+                    // Cliente envia para o servidor
+                    udpClient.Send(data, data.Length, remoteEndPoint);
+                }
             }
-            else
+            catch (System.Exception e)
             {
-                // Cliente envia para o servidor
-                udpClient.Send(data, data.Length, remoteEndPoint);
+                AddSystemMessage($"Erro ao enviar: {e.Message}");
             }
             
             chatInput.text = "";
@@ -234,7 +257,7 @@ public class UDPChatSystem : MonoBehaviour
         
         foreach (IPEndPoint client in connectedClients)
         {
-            if (exclude != null && client.Address.Equals(exclude.Address))
+            if (exclude != null && client.Address.Equals(exclude.Address) && client.Port == exclude.Port)
                 continue;
                 
             try
@@ -276,31 +299,71 @@ public class UDPChatSystem : MonoBehaviour
     
     void UpdateChatDisplay()
     {
-        chatDisplay.text = string.Join("\n", chatMessages.ToArray());
-        
-        // Auto-scroll para baixo
-        Canvas.ForceUpdateCanvases();
-        scrollRect.verticalNormalizedPosition = 0f;
+        if (chatDisplay != null)
+        {
+            chatDisplay.text = string.Join("\n", chatMessages.ToArray());
+            
+            // Auto-scroll para baixo
+            if (scrollRect != null)
+            {
+                Canvas.ForceUpdateCanvases();
+                scrollRect.verticalNormalizedPosition = 0f;
+            }
+        }
     }
     
     void OnApplicationQuit()
     {
-        if (udpClient != null)
+        CloseConnection();
+    }
+    
+    void OnDisable()
+    {
+        CloseConnection();
+    }
+    
+    void OnDestroy()
+    {
+        CloseConnection();
+    }
+    
+    void CloseConnection()
+    {
+        if (udpClient != null && isRunning)
         {
+            isRunning = false;
+            
             // Envia mensagem de desconexão
-            string disconnectMsg = $"DISCONNECT|{playerName}";
-            byte[] data = Encoding.UTF8.GetBytes(disconnectMsg);
-            
-            if (isServer)
+            try
             {
-                BroadcastMessage(disconnectMsg);
+                string disconnectMsg = $"DISCONNECT|{playerName}";
+                byte[] data = Encoding.UTF8.GetBytes(disconnectMsg);
+                
+                if (isServer)
+                {
+                    BroadcastMessage(disconnectMsg);
+                }
+                else
+                {
+                    udpClient.Send(data, data.Length, remoteEndPoint);
+                }
             }
-            else
+            catch { }
+            
+            // Fecha cliente UDP
+            try
             {
-                udpClient.Send(data, data.Length, remoteEndPoint);
+                udpClient.Close();
+            }
+            catch { }
+            
+            // Para a thread
+            if (receiveThread != null && receiveThread.IsAlive)
+            {
+                receiveThread.Abort();
             }
             
-            udpClient.Close();
+            udpClient = null;
         }
     }
 }
